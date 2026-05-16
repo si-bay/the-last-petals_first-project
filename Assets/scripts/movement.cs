@@ -8,7 +8,8 @@ public class PlayerController : MonoBehaviour
 
     [Header("Jump Settings")]
     public float jumpForce = 8f;
-    public float doubleJumpWindow = 0.3f; // Toleransi waktu untuk double jump
+    [Tooltip("Jendela waktu maksimal setelah lompatan 1 untuk melakukan double jump.")]
+    public float doubleJumpWindow = 0.03f; 
 
     [Header("Ground Detection")]
     public Transform groundCheck;
@@ -19,9 +20,9 @@ public class PlayerController : MonoBehaviour
     private bool isGrounded;
     private bool isFacingRight = true;
 
-    // State Machine Double Jump
-    private float jumpTimer = 0f;
-    private bool canDoubleJump = false;
+    // State Double Jump
+    private int jumpCount = 0;          // 0=Di tanah, 1=Lompat 1, 2=Lompat 2 (MAX)
+    private float firstJumpTime = 0f;   // Mencatat waktu saat lompatan pertama terjadi
 
     [SerializeField] private SpriteRenderer playerSprite;
 
@@ -31,7 +32,6 @@ public class PlayerController : MonoBehaviour
     {
         HandleJumpInput();
         HandleSpriteFlip();
-        UpdateTimer();
     }
 
     private void FixedUpdate()
@@ -45,11 +45,12 @@ public class PlayerController : MonoBehaviour
         bool wasGrounded = isGrounded;
         isGrounded = Physics2D.OverlapCircle(groundCheck.position, checkRadius, groundLayer);
 
-        // 🔒 RESET KUNCI LOMPAT: Hanya terjadi saat transisi Udara -> Tanah
+        // 🔁 RESET: Hanya terjadi saat transisi Udara → Tanah
         if (isGrounded && !wasGrounded)
         {
-            canDoubleJump = true; // Buka kembali kesempatan lompat
-            jumpTimer = 0f;
+            jumpCount = 0;
+            firstJumpTime = 0f;
+            Debug.Log(" Menyentuh tanah -> JumpCount di-reset ke 0");
         }
     }
 
@@ -63,30 +64,32 @@ public class PlayerController : MonoBehaviour
     {
         if (Input.GetButtonDown("Jump"))
         {
+            // 1️⃣ LOMPAT PERTAMA (Saat di tanah)
             if (isGrounded)
             {
-                // 1️⃣ LOMPAT PERTAMA (dari tanah)
-                rb.linearVelocity = new Vector2(rb.linearVelocity.x, jumpForce);
-                canDoubleJump = true;
-                jumpTimer = doubleJumpWindow;
+                PerformJump();
+                jumpCount = 1;
+                firstJumpTime = Time.time; // Mulai hitung waktu 0.03s
+                Debug.Log("🚀 Lompat 1! Timer 0.03s dimulai.");
             }
-            else if (canDoubleJump && jumpTimer > 0f)
+            // 2️ DOUBLE JUMP (Saat di udara, jumpCount==1, DAN masih dalam 0.03s)
+            else if (jumpCount == 1 && (Time.time - firstJumpTime <= doubleJumpWindow))
             {
-                // 2️ DOUBLE JUMP (di udara, dalam window 0.3s)
-                rb.linearVelocity = new Vector2(rb.linearVelocity.x, jumpForce);
-                
-                // 🔒 KUNCI LOMPAT: Matikan kesempatan lompat lagi
-                canDoubleJump = false; 
-                jumpTimer = 0f;
+                PerformJump();
+                jumpCount = 2; // 🔒 KUNCI: Capai limit 2x
+                Debug.Log("🚀 Double Jump! Limit 2x tercapai. Lompatan ke-3 akan gagal.");
             }
-            //  Jika tidak masuk kedua kondisi di atas, input DIABAIKAN.
-            // Player TIDAK bisa lompat lagi sampai menyentuh tanah.
+            // 3️⃣ GAGAL (Jika jumpCount==2 ATAU sudah lewat 0.03s)
+            else
+            {
+                Debug.Log($"❌ Lompatan ke-{jumpCount + 1} GAGAL. (Limit 2x sudah terpenuhi / Waktu 0.03s habis)");
+            }
         }
     }
 
-    private void UpdateTimer()
+    private void PerformJump()
     {
-        if (jumpTimer > 0f) jumpTimer -= Time.deltaTime;
+        rb.linearVelocity = new Vector2(rb.linearVelocity.x, jumpForce);
     }
 
     private void HandleSpriteFlip()
