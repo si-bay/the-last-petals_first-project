@@ -4,131 +4,126 @@ using System.Collections;
 
 public class NoteInteraction : MonoBehaviour
 {
-    [Header(" UI References")]
-    public CanvasGroup notePanel;      // Panel + CanvasGroup
-    public Image darkOverlay;          // Fullscreen hitam
+    [Header("🖼️ UI Ref")]
+    public CanvasGroup notePanel;
+    public Image darkOverlay;
+    public CanvasGroup promptUI; // ← DRAG Prompt_PressE KE SINI
+
+    [Header("🔊 Audio")]
+    public AudioClip paperFlipSound;
+    private AudioSource audioSource;
 
     [Header("⚙️ Settings")]
     public KeyCode interactKey = KeyCode.E;
-    public float transitionSpeed = 3f; // Kecepatan animasi buka/tutup
+    public float animSpeed = 4f;
 
     private bool isNear = false;
-    private bool isOpen = false;
+    public bool isOpen { get; private set; } = false;
     private PlayerController playerController;
 
     void Start()
     {
-        // Cari otomatis PlayerController di scene
-        playerController = FindObjectOfType<PlayerController>();
-        
-        // State awal: invisible & non-aktif
-        if (notePanel) 
-        {
-            notePanel.alpha = 0f;
-            notePanel.interactable = false;
-            notePanel.blocksRaycasts = false;
-            notePanel.gameObject.SetActive(false);
-        }
-        if (darkOverlay) darkOverlay.gameObject.SetActive(false);
+        playerController = FindFirstObjectByType<PlayerController>();
+        audioSource = gameObject.AddComponent<AudioSource>();
+        audioSource.playOnAwake = false;
+
+        // Sembunyikan UI awal
+        if (notePanel) { notePanel.alpha = 0f; notePanel.gameObject.SetActive(false); }
+        if (darkOverlay) darkOverlay.color = new Color(0, 0, 0, 0);
+        if (promptUI) { promptUI.alpha = 0f; promptUI.gameObject.SetActive(false); }
     }
 
-    // Trigger saat Player mendekat
     void OnTriggerEnter2D(Collider2D other)
     {
-        if (other.CompareTag("Player")) 
+        if (other.CompareTag("Player"))
         {
             isNear = true;
-            Debug.Log("📜 Dekat dengan catatan. Tekan [E] untuk membaca.");
+            ShowPrompt();
         }
     }
 
     void OnTriggerExit2D(Collider2D other)
     {
-        if (other.CompareTag("Player")) 
+        if (other.CompareTag("Player"))
         {
             isNear = false;
-            if (isOpen) CloseNote(); // Auto-close jika player jalan menjauh
+            HidePrompt();
+            if (isOpen) CloseNote();
         }
     }
 
     void Update()
     {
-        // Buka catatan
-        if (isNear && Input.GetKeyDown(interactKey) && !isOpen)
-            OpenNote();
-        // Tutup catatan
-        else if (isOpen && Input.GetKeyDown(interactKey))
-            CloseNote();
+        if (isNear && Input.GetKeyDown(interactKey))
+        {
+            if (!isOpen) OpenNote();
+            else CloseNote();
+        }
     }
 
     void OpenNote()
     {
         isOpen = true;
-        playerController.enabled = false; // Matikan kontrol player
-        notePanel.gameObject.SetActive(true);
-        darkOverlay.gameObject.SetActive(true);
+        HidePrompt(); // Sembunyikan prompt saat membaca
+        PlaySound();
+        
+        playerController.enabled = false;
+        if (notePanel) { notePanel.gameObject.SetActive(true); notePanel.alpha = 0f; }
+        if (darkOverlay) { darkOverlay.gameObject.SetActive(true); }
         StartCoroutine(AnimateOpen());
     }
 
     void CloseNote()
     {
         isOpen = false;
+        PlaySound();
         StartCoroutine(AnimateClose());
     }
 
-    // Animasi Buka (menggunakan unscaledDeltaTime karena game di-pause)
     IEnumerator AnimateOpen()
     {
-        float t = 0f;
+        float t = 0;
         while (t < 1f)
         {
-            t += Time.unscaledDeltaTime * transitionSpeed;
-            
-            // Fade overlay & note
-            if (darkOverlay) darkOverlay.color = new Color(0, 0, 0, Mathf.Lerp(0f, 0.85f, t));
+            t += Time.unscaledDeltaTime * animSpeed;
+            if (darkOverlay) darkOverlay.color = new Color(0, 0, 0, Mathf.Lerp(0f, 0.9f, t));
             if (notePanel) notePanel.alpha = Mathf.Lerp(0f, 1f, t);
-            
-            // Zoom in note
-            if (notePanel) notePanel.transform.localScale = Vector3.one * Mathf.Lerp(0.5f, 1f, t);
-            
             yield return null;
         }
-        
-        // Kunci final state
-        if (notePanel) 
-        {
-            notePanel.alpha = 1f;
-            notePanel.interactable = true;
-            notePanel.blocksRaycasts = true;
-        }
-        Time.timeScale = 0f; // Pause game sepenuhnya
+        if (notePanel) notePanel.alpha = 1f;
     }
 
-    // Animasi Tutup (menggunakan deltaTime normal)
     IEnumerator AnimateClose()
     {
-        Time.timeScale = 1f; // Resume game dulu
-        
-        float t = 0f;
+        float t = 0;
         while (t < 1f)
         {
-            t += Time.deltaTime * transitionSpeed;
-            
-            if (darkOverlay) darkOverlay.color = new Color(0, 0, 0, Mathf.Lerp(0.85f, 0f, t));
+            t += Time.deltaTime * animSpeed;
+            if (darkOverlay) darkOverlay.color = new Color(0, 0, 0, Mathf.Lerp(0.9f, 0f, t));
             if (notePanel) notePanel.alpha = Mathf.Lerp(1f, 0f, t);
-            if (notePanel) notePanel.transform.localScale = Vector3.one * Mathf.Lerp(1f, 0.5f, t);
-            
             yield return null;
         }
         
-        // Non-aktifkan UI & kembalikan kontrol
-        if (notePanel) 
-        {
-            notePanel.gameObject.SetActive(false);
-            notePanel.interactable = false;
-            notePanel.blocksRaycasts = false;
-        }
+        if (notePanel) notePanel.gameObject.SetActive(false);
         if (darkOverlay) darkOverlay.gameObject.SetActive(false);
         playerController.enabled = true;
+        
+        if (isNear) ShowPrompt(); // Munculkan lagi jika player masih di zona
+    }
+
+    void PlaySound() { if (paperFlipSound && audioSource) audioSource.PlayOneShot(paperFlipSound); }
+
+    void ShowPrompt()
+    {
+        if (promptUI)
+        {
+            promptUI.gameObject.SetActive(true);
+            promptUI.alpha = 1f;
+        }
+    }
+
+    void HidePrompt()
+    {
+        if (promptUI) promptUI.gameObject.SetActive(false);
     }
 }

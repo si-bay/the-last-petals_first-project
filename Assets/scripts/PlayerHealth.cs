@@ -3,15 +3,16 @@ using System.Collections;
 
 public class PlayerHealth : MonoBehaviour
 {
-    [Header("️ Health Settings")]
-    public int maxHealth = 3;
-    [HideInInspector] public int currentHealth;
+    [Header("❤️ Settings")]
+    public int maxHealth = 1;
+    public int maxDeathsBeforeGameOver = 3;
+    private static int sessionDeathCount = 0; // Reset di MenuManager
 
-    [Header("🔥 Hazard Detection")]
-    public LayerMask hazardLayer; // Assign layer "Hazard" di Inspector
+    [Header("⚠️ Hazard")]
+    public LayerMask hazardLayer; // Centang layer Hazard & Enemy
 
-    [Header("🔄 Respawn Settings")]
-    public float respawnDelay = 1.5f;
+    [Header("🔄 Respawn")]
+    public float respawnDelay = 1.2f;
     public float invincibilityTime = 2f;
 
     private PlayerController playerController;
@@ -20,14 +21,12 @@ public class PlayerHealth : MonoBehaviour
 
     void Awake()
     {
-        currentHealth = maxHealth;
-        playerController = GetComponent<PlayerController>();
         rb = GetComponent<Rigidbody2D>();
+        playerController = GetComponent<PlayerController>();
     }
 
     void Start()
     {
-        // Set checkpoint awal ke posisi spawn pertama kali
         if (CheckpointManager.LastCheckpointPosition == Vector3.zero)
             CheckpointManager.SetCheckpoint(transform.position);
     }
@@ -36,58 +35,52 @@ public class PlayerHealth : MonoBehaviour
     {
         if (isInvincible) return;
 
-        // Cek apakah objek yang disentuh ada di layer Hazard
+        // Cek apakah layer objek bertabrakan ada di mask hazard
         if (((1 << other.gameObject.layer) & hazardLayer) != 0)
         {
-            // Langsung mati saat sentuh obstacle (bisa diubah ke TakeDamage(1) kalau mau sistem HP bertahap)
-            TakeDamage(maxHealth); 
+            TakeDamage(maxHealth);
         }
     }
 
     public void TakeDamage(int damage)
     {
-        currentHealth -= damage;
-        Debug.Log($"❤️ Health: {currentHealth}/{maxHealth}");
-
-        if (currentHealth <= 0)
-        {
-            Die();
-        }
+        // Jika HP <= 0 langsung mati (Instant Death logic)
+        Die();
     }
 
     void Die()
     {
-        Debug.Log("💀 Player mati! Respawn...");
-        
-        // Matikan kontrol movement & jump
-        if (playerController != null) playerController.enabled = false;
-        
-        // TODO: Play death animation / sound di sini
-        
-        Invoke(nameof(Respawn), respawnDelay);
-    }
+        sessionDeathCount++;
 
-    void Respawn()
+        if (sessionDeathCount >= maxDeathsBeforeGameOver)
+        {
+            // ✅ GANTI DENGAN LOOKUP DINAMIS
+            GameOverManager gm = FindFirstObjectByType<GameOverManager>();
+            if (gm != null) gm.ShowGameOver();
+            return;
+        }
+
+        StartCoroutine(RespawnRoutine());
+    }
+    IEnumerator RespawnRoutine()
     {
-        // Pindah ke checkpoint terakhir
-        transform.position = CheckpointManager.LastCheckpointPosition;
-        
-        // Reset state
-        currentHealth = maxHealth;
+        // Matikan player
+        playerController.enabled = false;
         rb.linearVelocity = Vector2.zero;
-        isInvincible = true;
-        
-        // Nyalakan kembali kontrol
-        if (playerController != null) playerController.enabled = true;
-        
-        Debug.Log("✨ Respawn berhasil!");
-        StartCoroutine(EndInvincibility());
-    }
 
-    IEnumerator EndInvincibility()
-    {
-        // TODO: Tambahkan efek flicker/flash sprite selama invincible
+        // Tunggu sebentar (opsional: play death animasi)
+        yield return new WaitForSeconds(respawnDelay);
+
+        // Pindah ke checkpoint
+        transform.position = CheckpointManager.LastCheckpointPosition;
+        rb.linearVelocity = Vector2.zero;
+        playerController.enabled = true;
+        isInvincible = true;
+
+        // Invincibility frames (kedip-kedip)
         yield return new WaitForSeconds(invincibilityTime);
         isInvincible = false;
     }
+
+    public static void ResetDeathCounter() => sessionDeathCount = 0;
 }
