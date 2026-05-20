@@ -1,32 +1,42 @@
 using UnityEngine;
-using UnityEngine.UI;
 using UnityEngine.SceneManagement;
+using UnityEngine.UI;
 
 public class GameOverManager : MonoBehaviour
 {
-    public CanvasGroup gameOverPanel;
-    
-    // Method ini WAJIB bernama ShowGameOver() agar dipanggil PlayerHealth
+    public static GameOverManager Instance; // Agar bisa dipanggil dari PlayerHealth
+    public CanvasGroup gameOverPanel;       // Link ke UI_GameOver
+
+    void Awake()
+    {
+        Instance = this;
+        // Pastikan tersembunyi saat mulai
+        if(gameOverPanel != null)
+        {
+            gameOverPanel.alpha = 0;
+            gameOverPanel.interactable = false;
+            gameOverPanel.blocksRaycasts = false;
+        }
+    }
+
     public void ShowGameOver()
     {
-        if (gameOverPanel == null) return;
-        
         gameOverPanel.gameObject.SetActive(true);
-        gameOverPanel.alpha = 1f;
+        gameOverPanel.alpha = 1;
         gameOverPanel.interactable = true;
         gameOverPanel.blocksRaycasts = true;
-        Time.timeScale = 0f;
+        Time.timeScale = 0f; // Stop total game
     }
 
     public void Retry()
     {
-        Time.timeScale = 1f;
-        SceneManager.LoadScene(SceneManager.GetActiveScene().name);
+        Time.timeScale = 1f; // Lanjutkan waktu
+        SceneManager.LoadScene(SceneManager.GetActiveScene().name); // Reload scene
     }
 
     public void ToMainMenu()
     {
         Time.timeScale = 1f;
-        SceneManager.LoadScene("MainMenu");
+        SceneManager.LoadScene("MainMenu"); // Ganti dengan nama scene menu kamu
     }
 }

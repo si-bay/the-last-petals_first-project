@@ -3,11 +3,14 @@ using UnityEngine.SceneManagement;
 
 public class MenuManager : MonoBehaviour
 {
-    public string gameplaySceneName = "Gameplay"; // Nama scene gameplay kamu
+    [Tooltip("Nama persis file scene gameplay kamu (tanpa .unity)")]
+    public string gameplaySceneName = "Gameplay";
 
     public void PlayGame()
     {
-        PlayerHealth.ResetDeathCounter(); // Reset kematian sebelum mulai
+        // ✅ TIDAK PERLU RESET MANUAL LAGI
+        // PlayerHealth.cs sudah auto-reset currentLives di method Awake() 
+        // saat SceneManager.LoadScene() dijalankan.
         SceneManager.LoadScene(gameplaySceneName);
     }
 

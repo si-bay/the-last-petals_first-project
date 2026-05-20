@@ -4,83 +4,109 @@ using System.Collections;
 public class PlayerHealth : MonoBehaviour
 {
     [Header("❤️ Settings")]
-    public int maxHealth = 1;
-    public int maxDeathsBeforeGameOver = 3;
-    private static int sessionDeathCount = 0; // Reset di MenuManager
+    public int maxLives = 3;
+    public int currentLives;
+    public HealthUI healthUI; // <-- WAJIB DI-LINK DARI INSPECTOR
 
-    [Header("⚠️ Hazard")]
+    [Header("⚠️ Danger")]
     public LayerMask hazardLayer; // Centang layer Hazard & Enemy
 
     [Header("🔄 Respawn")]
-    public float respawnDelay = 1.2f;
-    public float invincibilityTime = 2f;
+    public float respawnDelay = 1.0f;
+    public float invincibilityTime = 2.0f;
 
     private PlayerController playerController;
     private Rigidbody2D rb;
+    private SpriteRenderer spriteRenderer;
     private bool isInvincible = false;
 
     void Awake()
     {
         rb = GetComponent<Rigidbody2D>();
         playerController = GetComponent<PlayerController>();
+        spriteRenderer = GetComponentInChildren<SpriteRenderer>();
+        currentLives = maxLives; // Reset nyawa tiap kali masuk scene
     }
 
     void Start()
     {
+        // Set checkpoint awal jika belum ada
         if (CheckpointManager.LastCheckpointPosition == Vector3.zero)
             CheckpointManager.SetCheckpoint(transform.position);
+        
+        // Update UI saat game mulai
+        if (healthUI != null)
+            healthUI.UpdateHearts(currentLives);
     }
 
-    private void OnTriggerEnter2D(Collider2D other)
+    void OnTriggerEnter2D(Collider2D other)
     {
         if (isInvincible) return;
 
-        // Cek apakah layer objek bertabrakan ada di mask hazard
+        // Cek apakah yang ditabrak ada di layer Hazard/Enemy
         if (((1 << other.gameObject.layer) & hazardLayer) != 0)
         {
-            TakeDamage(maxHealth);
+            TakeDamage(1);
         }
     }
 
-    public void TakeDamage(int damage)
+    public void TakeDamage(int amount)
     {
-        // Jika HP <= 0 langsung mati (Instant Death logic)
-        Die();
+        currentLives -= amount;
+
+        // 1. Update Tampilan UI
+        if (healthUI != null)
+            healthUI.UpdateHearts(currentLives);
+
+        // 2. Cek Mati atau Respawn
+        if (currentLives <= 0)
+        {
+            Die(); // Game Over
+        }
+        else
+        {
+            StartCoroutine(RespawnRoutine()); // Respawn di checkpoint
+        }
     }
 
     void Die()
     {
-        sessionDeathCount++;
-
-        if (sessionDeathCount >= maxDeathsBeforeGameOver)
-        {
-            // ✅ GANTI DENGAN LOOKUP DINAMIS
-            GameOverManager gm = FindFirstObjectByType<GameOverManager>();
-            if (gm != null) gm.ShowGameOver();
-            return;
-        }
-
-        StartCoroutine(RespawnRoutine());
-    }
-    IEnumerator RespawnRoutine()
-    {
-        // Matikan player
+        // Matikan kontrol player
         playerController.enabled = false;
         rb.linearVelocity = Vector2.zero;
 
-        // Tunggu sebentar (opsional: play death animasi)
-        yield return new WaitForSeconds(respawnDelay);
+        // Panggil Game Over Screen
+        if (GameOverManager.Instance != null)
+        {
+            GameOverManager.Instance.ShowGameOver();
+        }
+    }
+
+    IEnumerator RespawnRoutine()
+    {
+        isInvincible = true;
+        playerController.enabled = false;
+        rb.linearVelocity = Vector2.zero;
+
+        yield return new WaitForSecondsRealtime(respawnDelay);
 
         // Pindah ke checkpoint
         transform.position = CheckpointManager.LastCheckpointPosition;
-        rb.linearVelocity = Vector2.zero;
         playerController.enabled = true;
-        isInvincible = true;
-
-        // Invincibility frames (kedip-kedip)
-        yield return new WaitForSeconds(invincibilityTime);
-        isInvincible = false;
+        
+        StartCoroutine(InvincibilityEffect());
     }
 
-    public static void ResetDeathCounter() => sessionDeathCount = 0;
+    IEnumerator InvincibilityEffect()
+    {
+        float t = 0;
+        while (t < invincibilityTime)
+        {
+            spriteRenderer.enabled = !spriteRenderer.enabled; // Kedip-kedip
+            yield return new WaitForSecondsRealtime(0.1f);
+            t += 0.1f;
+        }
+        spriteRenderer.enabled = true;
+        isInvincible = false;
+    }
 }
