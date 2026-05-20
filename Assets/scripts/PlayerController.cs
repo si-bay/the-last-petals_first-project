@@ -1,9 +1,9 @@
 using UnityEngine;
 
 [RequireComponent(typeof(Rigidbody2D))]
-public class PlayerController : MonoBehaviour // ✅ NAMA DIKEMBALIKAN KE PlayerController
+public class PlayerController : MonoBehaviour
 {
-    [Header("️ Movement")]
+    [Header("⚙️ Movement")]
     public float moveSpeed = 5f;
     public float jumpForce = 10f;
     public int maxJumps = 2;
@@ -12,6 +12,9 @@ public class PlayerController : MonoBehaviour // ✅ NAMA DIKEMBALIKAN KE Player
     public Transform groundCheck;
     public float checkRadius = 0.25f;
     public LayerMask groundLayer;
+
+    [Header(" Animation")]
+    private Animator anim;
 
     private Rigidbody2D rb;
     private bool isGrounded;
@@ -23,6 +26,7 @@ public class PlayerController : MonoBehaviour // ✅ NAMA DIKEMBALIKAN KE Player
     private void Awake()
     {
         rb = GetComponent<Rigidbody2D>();
+        anim = GetComponent<Animator>(); // Inisialisasi Animator
         if (spriteRenderer == null)
             spriteRenderer = GetComponentInChildren<SpriteRenderer>();
     }
@@ -31,6 +35,14 @@ public class PlayerController : MonoBehaviour // ✅ NAMA DIKEMBALIKAN KE Player
     {
         HandleJump();
         HandleFlip();
+
+        // Update parameter animasi setiap frame
+        if (anim != null)
+        {
+            anim.SetBool("isGrounded", isGrounded);
+            // Pakai velocity biar tidak "lari di tempat" saat nabrak tembok
+            anim.SetBool("isRunning", Mathf.Abs(rb.linearVelocity.x) > 0.1f);
+        }
     }
 
     private void FixedUpdate()
@@ -42,11 +54,8 @@ public class PlayerController : MonoBehaviour // ✅ NAMA DIKEMBALIKAN KE Player
     private void CheckGround()
     {
         if (groundCheck != null)
-        {
             isGrounded = Physics2D.OverlapCircle(groundCheck.position, checkRadius, groundLayer);
-        }
 
-        // ️ Reset tiap frame saat di tanah → anti-stuck jump
         if (isGrounded) jumpCount = 0;
     }
 

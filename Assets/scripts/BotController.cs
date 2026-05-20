@@ -20,7 +20,7 @@ public class BotController : MonoBehaviour
     private Animator anim;
     private SpriteRenderer spriteRenderer;
     private Vector3 startPos;
-    private bool facingRight = true;
+    private bool facingRight = false;
     private bool isChasing = false;
 
     private Collider2D detectedPlayer; 
@@ -70,8 +70,8 @@ public class BotController : MonoBehaviour
 
     void HandleFlip()
     {
-        if (facingRight) spriteRenderer.flipX = false;
-        else spriteRenderer.flipX = true;
+        if (facingRight) spriteRenderer.flipX = true;
+        else spriteRenderer.flipX = false;
     }
 
     void OnTriggerEnter2D(Collider2D other)
